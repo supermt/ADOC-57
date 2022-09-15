@@ -352,6 +352,21 @@ Status FlushJob::WriteLevel0Table() {
   cfd_->internal_stats()->AddCompactionStats(0 /* level */, stats);
   cfd_->internal_stats()->AddCFStats(InternalStats::BYTES_FLUSHED,
                                      meta_.fd.GetFileSize());
+  FlushMetrics metrics;
+  metrics.total_bytes = stats.bytes_written;
+  metrics.memtable_ratio = 0.0;
+  for (auto mem : mems_) {
+    metrics.memtable_ratio += (double)mem->ApproximateMemoryUsage() /
+                              mutable_cf_options_.write_buffer_size;
+  }
+  auto vfs = cfd_->current()->storage_info();
+  metrics.l0_files = vfs->NumLevelFiles(vfs->base_level());
+  metrics.memtable_ratio /= mems_.size();
+  metrics.write_out_bandwidth = stats.bytes_written / stats.micros;
+
+  db_options_.flush_stats->push_back(metrics);
+
+
   RecordFlushIOStats();
   return s;
 }
